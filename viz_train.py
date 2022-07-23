@@ -5,7 +5,9 @@ import logging
 import argparse
 import numpy as np
 from tqdm import tqdm
+from pathlib import Path
 
+import cv2
 import torch
 import torch.utils.data
     
@@ -13,13 +15,19 @@ from lib.averageMeter import AverageMeters
 from lib.logger import colorlogger
 from lib.timer import Timers
 from lib.averageMeter import AverageMeters
-from lib.torch_utils import adjust_learning_rate
+# from lib.torch_utils import adjust_learning_rate
+from lib.viz_utils import draw
 
-from modeling.build_model import Pose2Seg
+# from modeling.build_model import Pose2Seg
 from datasets.CocoDatasetInfo import CocoDatasetInfo, annToMask
 from datasets.OCP import OCP_Dataset
+# from test import test
 
-from test import test
+import random 
+random.seed(88)
+np.random.seed(88)
+torch.manual_seed(88)
+
 
 NAME = "release_base"
 
@@ -43,10 +51,13 @@ timers = Timers()
 
 # Set Global AverageMeter
 averMeters = AverageMeters()
-    
-def train(model, dataloader, optimizer, epoch, iteration):
+
+outdir = Path('./viz/')
+
+
+def train(dataloader, epoch, iteration):
     # switch to train mode
-    model.train()
+    # model.train()
     
     averMeters.clear()
     end = time.time()
@@ -54,21 +65,32 @@ def train(model, dataloader, optimizer, epoch, iteration):
         averMeters['data_time'].update(time.time() - end)
         iteration += 1
         
-        lr = adjust_learning_rate(optimizer, iteration, BASE_LR=0.0002,
-                         WARM_UP_FACTOR=1.0/3, WARM_UP_ITERS=1000,
-                         STEPS=(0, 14150*15, 14150*20), GAMMA=0.1)  
-        
         # forward
-        outputs = model(**inputs)
-        
-        # loss
-        loss = outputs
-            
-        # backward
-        averMeters['loss'].update(loss.data.item())
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        input_dict = inputs
+        print(i)
+        # print(len(input_dict['batchimgs']))
+        # print(input_dict['batchimgs'][0].shape)
+        # print(len(input_dict['batchkpts']))
+        # print(input_dict['batchkpts'][0].shape)
+        # print(len(input_dict['batchmasks']))
+        # print(input_dict['batchmasks'][0].shape)
+
+        img = input_dict['batchimgs'][0]
+        kpts = input_dict['batchkpts'][0]
+        masks = input_dict['batchmasks'][0]
+
+        out_img_path = outdir / f'{i}.jpg'
+        cv2.imwrite(str(out_img_path), img)
+
+        draw(
+            img, 
+            masks, 
+            kpts, 
+            out_img_path,
+        )
+
+
+        # import pdb;pdb.set_trace()
         
         # measure elapsed time
         averMeters['batch_time'].update(time.time() - end)
@@ -76,19 +98,12 @@ def train(model, dataloader, optimizer, epoch, iteration):
         
         if i % 10 == 0:
             logger.info('Epoch: [{0}][{1}/{2}]\t'
-                  'Lr: [{3}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'loss {loss.val:.5f} ({loss.avg:.5f})\t'
                   .format(
-                      epoch, i, len(dataloader), lr, 
+                      epoch, i, len(dataloader), 
                       batch_time=averMeters['batch_time'], data_time=averMeters['data_time'],
-                      loss=averMeters['loss'])
-                 )
-        
-        if i % 10000 == 0:  
-            torch.save(model.state_dict(), os.path.join(SNAPSHOTDIR, '%d_%d.pkl'%(epoch,i)))
-            torch.save(model.state_dict(), os.path.join(SNAPSHOTDIR, 'last.pkl'))
+                 ))
         
     return iteration
 
@@ -121,36 +136,24 @@ class Dataset():
         
 if __name__=='__main__':
     logger.info('===========> loading model <===========')
-    model = Pose2Seg().cuda()
+    # model = Pose2Seg().cuda()
     #model.init("")
-    model.train()
+    # model.train()
     
     logger.info('===========> loading data <===========')
-    datasetTrain = OCP_Dataset()
-    dataloaderTrain = torch.utils.data.DataLoader(datasetTrain, batch_size=4, shuffle=True,
-                                                   num_workers=4, pin_memory=False,
+    datasetTrain = OCP_Dataset(
+        imageroot='./data/coco2017/val2017',
+        annofile='./data/coco2017/annotations/person_keypoints_val2017_pose2seg.json',
+    )
+    dataloaderTrain = torch.utils.data.DataLoader(datasetTrain, batch_size=1, shuffle=True,
+                                                   num_workers=1, pin_memory=False,
                                                    collate_fn=datasetTrain.collate_fn)
 
 
-    logger.info('===========> set optimizer <===========')
-    ''' set your optimizer like this. Normally is Adam/SGD. '''
-    #optimizer = torch.optim.SGD(model.parameters(), 0.0002, momentum=0.9, weight_decay=0.0005)
-    optimizer = torch.optim.Adam(model.parameters(), 0.0002, weight_decay=0.0000)
-
     iteration = 0
     epoch = 0
-    try:
-        while iteration < 14150*25:
-            logger.info('===========>   training    <===========')
-            iteration = train(model, dataloaderTrain, optimizer, epoch, iteration)
-            epoch += 1
+    while iteration < 14150*1:
+        logger.info('===========>   training    <===========')
+        iteration = train(dataloaderTrain, epoch, iteration)
+        epoch += 1
             
-            logger.info('===========>   testing    <===========')
-            test(model, dataset='cocoVal', logger=logger.info)
-            test(model, dataset='OCHumanVal', logger=logger.info)
-
-
-    except (KeyboardInterrupt):
-        logger.info('Save ckpt on exception ...')
-        torch.save(model.state_dict(), os.path.join(SNAPSHOTDIR, 'interrupt_%d_%d.pkl'%(epoch,iteration)))
-        logger.info('Save ckpt done.')
