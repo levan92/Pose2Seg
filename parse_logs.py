@@ -2,10 +2,11 @@ from pathlib import Path
 from collections import defaultdict
 
 logs = [
-    '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_09:39:01/train_logs.txt',
+    # '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_09:39:01/train_logs.txt',
     '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_09:39:47/train_logs.txt',
-    '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_09:41:19/train_logs.txt',
+    # '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_09:41:19/train_logs.txt',
     '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-22_08:53:35/train_logs.txt',
+    '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg/release_base_2022-07-26_09:51:10/train_logs.txt',
     '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg_ocp/release_base_2022-07-23_13:19:40/train_logs.txt',
     '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg_ocp/release_base_2022-07-23_13:30:02/train_logs.txt',
     '/Users/levan/Workspace/Pose2Seg_OCP/vm_logs/pose2seg_ocp/release_base_2022-07-23_13:30:49/train_logs.txt'
@@ -33,7 +34,7 @@ for log in logs:
             epoch += 1
             val = float(line.strip().split(' OCHumanVal ')[-1].split()[0])
             res['epoch'].append(epoch)
-            res['AP'].append(val)
+            res['AP'].append(val*100)
             res['set'].append(set)
             res['run'].append(run)
 
