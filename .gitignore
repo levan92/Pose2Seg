@@ -8,5 +8,10 @@ init
 logs
 snapshot
 
-viz/
+viz*/
 .DS_Store
+*.json
+pred_poses/
+vm_logs/
+figures/
+data
